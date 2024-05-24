@@ -57,18 +57,15 @@ public class PancakeSorting {
     Map<Integer, Map<Integer, Integer>> flipIndex = new HashMap<>();
     Map<Integer, Integer> prev = new HashMap<>(stack.length * stack.length);
 
-//    PriorityQueue<Integer> pq = new PriorityQueue<>(Comparator.comparingInt(it -> PancakeSorting.getDistance(stacks.get(it), targetStack)));
     PriorityQueue<Integer> pq = new PriorityQueue<>(Comparator.comparingInt(distances::get));
 
     distances.put(originKey, 0);
-//    flipIndex.put(originKey, new HashMap<>());
     prev.put(originKey, null);
     pq.add(originKey);
 
     while (!pq.isEmpty()) {
       int headKey = pq.poll();
       int[] head = stacks.get(headKey);
-      System.out.print("\r" + PancakeSorting.getDistance(head, targetStack));
 
       if (Arrays.equals(head, targetStack)) break;
 
@@ -107,31 +104,39 @@ public class PancakeSorting {
     return cases;
   }
 
+  private static int indexOfShortestList(List<List<Integer>> lists, int[][] toDistribute) {
+    int minimum = Integer.MAX_VALUE;
+    int minimumIndex = 0;
+
+    for (int i = 0; i < lists.size(); i++) {
+      List<Integer> list = lists.get(i);
+      int charge = list.stream().mapToInt(it -> toDistribute[it].length).sum();
+      if (charge < minimum) {
+        minimum = charge;
+        minimumIndex = i;
+      }
+    }
+
+    return minimumIndex;
+  }
+
   public static int[][] distributeCases(int[][] cases, int amount) {
+    System.out.println("Distributing " + cases.length + " cases in " + amount + " blocks...");
     int[][] toDistribute = Arrays.copyOf(cases, cases.length);
     Arrays.sort(toDistribute, Comparator.comparingInt(it -> -it.length));
 
-    PriorityQueue<List<Integer>> blocks = new PriorityQueue<>(
-        (list1, list2) -> {
-          int sum1 = list1.stream().mapToInt(index -> toDistribute[index].length).sum();
-          int sum2 = list2.stream().mapToInt(index -> toDistribute[index].length).sum();
-          System.out.printf("Comparing lists %s (sum: %d) and %s (sum: %d)\n", list1, sum1, list2, sum2);
-          return Integer.compare(sum1, sum2);
-        }
-    );
+    List<List<Integer>> blocks = new ArrayList<>();
 
     for (int i = 0; i < amount; i++) blocks.add(new ArrayList<>());
 
     for (int i = 0; i < toDistribute.length; i++) {
-      blocks.peek().add(i);
+      blocks.get(PancakeSorting.indexOfShortestList(blocks, toDistribute)).add(i);
     }
-
-    List<List<Integer>> queueResult = blocks.stream().toList();
 
     int[][] result = new int[amount][0];
 
     for (int i = 0; i < blocks.size(); i++) {
-      result[i] = queueResult.get(i).stream().mapToInt(it -> it).toArray();
+      result[i] = blocks.get(i).stream().mapToInt(it -> it).toArray();
     }
 
     return result;
@@ -146,7 +151,9 @@ public class PancakeSorting {
 
   public static void main(String[] args) throws FileNotFoundException {
     int availableCores = Runtime.getRuntime().availableProcessors();
-    int threadsToUse = Math.max(1, availableCores);
+    int threadsToUse = Math.max(1, availableCores - 2);
+
+    System.out.println("Using " + threadsToUse + " threads...");
 
     int[][] cases = PancakeSorting.getCases("P3.in");
     int[][] distributions = PancakeSorting.distributeCases(cases, threadsToUse);
