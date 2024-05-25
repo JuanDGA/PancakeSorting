@@ -265,8 +265,8 @@ public class PancakeSorting {
         continue;
       }
       String line = Arrays.stream(result)
-        .mapToObj(String::valueOf)
-        .collect(Collectors.joining(" "));
+          .mapToObj(String::valueOf)
+          .collect(Collectors.joining(" "));
       writer.write(line + "\n");
     }
 
@@ -302,8 +302,8 @@ class Visualization {
   }
 
   private static String createEdge(PancakeStack from, PancakeStack to, int steps, int distance, int flipIdx) {
-    return "\"" + Arrays.toString(from.stack()).replace(" ", "") +  "\" -> \"" + Arrays.toString(to.stack()).replace(" ", "") +
-            String.format("\" [label=\"%s;%s|%s\"];\n", steps, distance, flipIdx);
+    return "\"" + Arrays.toString(from.stack()).replace(" ", "") + "\" -> \"" + Arrays.toString(to.stack()).replace(" ", "") +
+        String.format("\" [label=\"%s;%s|%s\"];\n", steps, distance, flipIdx);
   }
 
   private static void createView(
