@@ -25,17 +25,13 @@ record PancakeStack(int[] stack) {
 
 public class PancakeSorting {
   public static void main(String[] args) throws IOException {
-    boolean[] settings = PancakeSorting.initialSettings();
-
     int[][] cases = PancakeSorting.getCases("P3.in");
     int[][] results = new int[cases.length][];
 
+    PancakeSorting.initialMessage();
+
     long totalTime = System.currentTimeMillis();
-    if (settings[0]) {
-      multipleThreads(cases, results);
-    } else {
-      singleCore(cases, results);
-    }
+    execute(cases, results);
     totalTime = System.currentTimeMillis() - totalTime;
 
     System.out.println("=".repeat(30) + " STATS " + "=".repeat(30));
@@ -45,9 +41,7 @@ public class PancakeSorting {
 
     PancakeSorting.exportResults(results, "P3.out");
 
-    if (settings[1]) {
-      Visualization.createVisualization(cases[0]);
-    }
+    Visualization.createVisualization(cases[0]);
   }
 
   private static void showStatistics(int[][] cases, int[][] results) {
@@ -126,7 +120,7 @@ public class PancakeSorting {
     return Math.abs(pancakeAPosition - pancakeBPosition) == 1;
   }
 
-  public static int getDistance(int[] stack, int[] targetStack) {
+  public static int getPairedNeighbors(int[] stack, int[] targetStack) {
     int distance = targetStack[0] != stack[0] ? 1 : 0;
     for (int i = 0; i < stack.length - 1; i++) {
       if (!isValidPair(stack[i], stack[i + 1], targetStack)) distance += 1;
@@ -134,7 +128,22 @@ public class PancakeSorting {
     return distance;
   }
 
-  private static List<Integer> search(int[] stack) {
+  public static int getPairedNeighbors(int[] stack, int[] targetStack, int flippingAt, int prevDistance) {
+    int distance = prevDistance;
+    if (flippingAt == 0) {
+      distance += stack[stack.length - 1] == targetStack[0] ? -1 : stack[0] == targetStack[0] ? 1 : 0;
+      return distance;
+    }
+    if (isValidPair(stack[stack.length - 1], stack[flippingAt - 1], targetStack)) {
+      distance -= 1;
+    }
+    if (isValidPair(stack[flippingAt], stack[flippingAt - 1], targetStack)) {
+      distance += 1;
+    }
+    return distance;
+  }
+
+  private static List<Integer> search(int[] stack) throws IOException {
     int[] target = Arrays.copyOf(stack, stack.length);
     Arrays.sort(target);
     target = PancakeSorting.flip(target, 0);
@@ -146,23 +155,23 @@ public class PancakeSorting {
     Map<PancakeStack, Map<PancakeStack, Integer>> flipIndices = new HashMap<>();
     Map<PancakeStack, PancakeStack> prev = new HashMap<>();
 
-    distances.put(start, PancakeSorting.getDistance(stack, target));
+    distances.put(start, PancakeSorting.getPairedNeighbors(stack, target));
     flipIndices.put(start, new HashMap<>());
     queue.add(start);
     prev.put(start, null);
 
-    while (!queue.isEmpty()) {
-      PancakeStack head = queue.poll();
+    while (!queue.isEmpty()) { // N² (Near to)
+      PancakeStack head = queue.poll(); // log(N²)
 
       if (head.equals(targetStack)) break;
 
-      for (int i = 0; i < head.stack().length - 1; i++) {
-        PancakeStack next = new PancakeStack(PancakeSorting.flip(head.stack(), i));
+      for (int i = 0; i < head.stack().length - 1; i++) { // N
+        PancakeStack next = new PancakeStack(PancakeSorting.flip(head.stack(), i)); // N
         if (next.equals(prev.get(head))) continue;
         if (!distances.containsKey(next)) {
           flipIndices.putIfAbsent(next, new HashMap<>());
           flipIndices.get(next).put(head, i);
-          distances.put(next, PancakeSorting.getDistance(next.stack(), target));
+          distances.put(next, PancakeSorting.getPairedNeighbors(head.stack(), target, i, distances.get(head))); // log(n)
           prev.put(next, head);
           queue.add(next);
         }
@@ -192,38 +201,24 @@ public class PancakeSorting {
     return cases;
   }
 
-  private static boolean[] initialSettings() {
-    boolean[] settings = new boolean[2];
-    Scanner input = new Scanner(System.in);
+  private static void initialMessage() {
     System.out.println("*** This is a project addressing the pancake sorting problem. ***");
     System.out.println("*** The file P3.in must be present in order to run the project. ***");
     System.out.println("=".repeat(68));
     System.out.println("=".repeat(20) + " Juan David Guevara Arévalo " + "=".repeat(20));
     System.out.println("=".repeat(68));
 
-    System.out.println("This project uses multithreading to solve multiple cases at the same time.");
-    System.out.println("Multithreading is not recommended in systems with low memory");
-    System.out.print("¿Do you want to use multithreading? (y/n)\n> ");
+    System.out.println("\nThis project uses multithreading to solve multiple cases at the same time.\n");
 
-    settings[0] = input.next().equalsIgnoreCase("y");
-
-    System.out.println("¿Do you want the system to generate a step-by-step visualization");
-    System.out.print("for the first case? [Not recommended for cases with more than 8 pancakes] (y/n)\n> ");
-
-    if (input.next().equalsIgnoreCase("y")) {
-      settings[1] = true;
-      System.out.println("The visualizations will be exported in a folder called \"visualizations\" in .dot format");
-      System.out.println(".dot files can be rendered using the GraphViz command line or using online tools.");
-    }
+    System.out.println("The visualizations will be exported in a folder called \"visualizations\" in .dot format");
+    System.out.println(".dot files can be rendered using the GraphViz command line or using online tools.");
 
     System.out.println("=".repeat(69));
     System.out.println("=".repeat(30) + " SOLVING " + "=".repeat(30));
     System.out.println("=".repeat(69));
-
-    return settings;
   }
 
-  private static void multipleThreads(int[][] cases, int[][] results) {
+  private static void execute(int[][] cases, int[][] results) {
     int availableCores = Runtime.getRuntime().availableProcessors();
     int threadsToUse = Math.max(1, availableCores - 2);
 
@@ -234,7 +229,11 @@ public class PancakeSorting {
     for (int i = 0; i < cases.length; i++) {
       int idx = i;
       executorService.submit(() -> {
-        results[idx] = PancakeSorting.search(cases[idx]).stream().mapToInt(it -> it).toArray();
+        try {
+          results[idx] = PancakeSorting.search(cases[idx]).stream().mapToInt(it -> it).toArray();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
       });
     }
 
@@ -244,13 +243,6 @@ public class PancakeSorting {
       if (!finished) System.err.println("Something went wrong");
     } catch (InterruptedException e) {
       e.printStackTrace(System.err);
-    }
-  }
-
-  private static void singleCore(int[][] cases, int[][] results) {
-    System.out.println("Solving on single core...");
-    for (int i = 0; i < cases.length; i++) {
-      results[i] = PancakeSorting.search(cases[i]).stream().mapToInt(it -> it).toArray();
     }
   }
 
@@ -355,7 +347,7 @@ class Visualization {
 
     Set<PancakeStack> initialPath = new LinkedHashSet<>();
     initialPath.add(start);
-    distances.put(start, PancakeSorting.getDistance(start.stack(), target.stack()));
+    distances.put(start, PancakeSorting.getPairedNeighbors(start.stack(), target.stack()));
     paths.put(start, initialPath);
     flipsTo.put(start, 0);
     visited.add(start);
@@ -377,7 +369,7 @@ class Visualization {
           flipsTo.put(next, flipsTo.get(head) + 1);
           flipIndices.putIfAbsent(next, new HashMap<>());
           flipIndices.get(next).put(head, i);
-          distances.put(next, PancakeSorting.getDistance(next.stack(), target.stack()));
+          distances.put(next, PancakeSorting.getPairedNeighbors(next.stack(), target.stack()));
           Set<PancakeStack> currentPath = new LinkedHashSet<>(paths.get(head));
           currentPath.add(next);
           prevStack.put(next, head);
